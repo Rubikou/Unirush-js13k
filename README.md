@@ -3,7 +3,8 @@
 **js13kGames 2026 entry. Theme: Unicorns and Rainbows.**
 A snake game where the order of what you eat is the whole puzzle.
 
-![Unirush gameplay: the unicorn catches the last colours of the rainbow in world 1, Sunrise, dodging a zombie, then rides the rainbow bridge into world 2, The Desert](media/gameplay.gif)
+
+![Unirush Cover](media/Unirush-cover.png)
 
 *Ten seconds of real play, recorded by an autopilot: `node scripts/record-gif.mjs`.*
 
@@ -18,6 +19,8 @@ runtime.
 
 You are a unicorn. The zombies drained the colours out of the world, and you
 put them back by catching them **in rainbow order**.
+
+![Unirush gameplay: the unicorn catches the last colours of the rainbow in world 1, Sunrise, dodging a zombie, then rides the rainbow bridge into world 2, The Desert](media/gameplay.gif)
 
 | Rule | What happens |
 |---|---|
