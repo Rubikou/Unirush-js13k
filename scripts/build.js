@@ -69,7 +69,14 @@ function build() {
   const html = readFileSync(SRC, 'utf8');
 
   // 1. extraction
-  const js = html.match(/<script>([\s\S]*)<\/script>/)?.[1];
+  let js = html.match(/<script>([\s\S]*)<\/script>/)?.[1];
+  // Le panneau de dev vit entre ces marqueurs et n'entre jamais dans le zip.
+  // Retire avant terser, donc pas un octet ne survit dans dist/index.html.
+  if (js) {
+    const before = js.length;
+    js = js.replace(/\/\*DEV\*\/[\s\S]*?\/\*\/DEV\*\//g, '');
+    if (js.length < before) console.log(`  panneau dev      -${before - js.length} o (hors zip)`);
+  }
   const css = html.match(/<style>([\s\S]*?)<\/style>/)?.[1] ?? '';
   if (!js) throw new Error('Aucun bloc <script> dans src/index.html');
 

@@ -13,7 +13,7 @@
       "stat_requirement": null
     },
     {
-      "identifier": "HALFWAY",
+      "identifier": "HALFWAY_THERE",
       "display_name": "Halfway There",
       "description": "Reach world 4.",
       "stat_requirement": null
@@ -43,7 +43,7 @@
       "stat_requirement": null
     },
     {
-      "identifier": "SPEEDRUN",
+      "identifier": "SPEED_OF_LIGHT",
       "display_name": "Speed of Light",
       "description": "Finish the game in under 100 seconds.",
       "stat_requirement": null
