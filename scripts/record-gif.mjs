@@ -28,6 +28,9 @@
  *                                                  et affiche la chronologie des événements
  *   node scripts/record-gif.mjs --seed=12          une autre partie
  *   node scripts/record-gif.mjs --from=235 --take=258
+ *   node scripts/record-gif.mjs --video --from=880 --take=540
+ *                                                  bande-annonce MP4 1280x720
+ *                                                  (media/trailer.mp4)
  *
  * La chronologie affichée à la fin (« f392 MODE play->levelup ») sert à choisir
  * --from et --take : c'est le numéro de l'image capturée.
@@ -51,17 +54,24 @@ const O = {
   secs: 20,         // durée simulée
   fps: 25,          // cadence de simulation (dt = 1/fps, doit rester <= 0.05 s)
   w: 1000, h: 820,  // taille de la fenêtre : le plateau 17x13 la remplit presque
+                    // (--video passe en 1280x720, le format attendu d'une video)
   from: 235,        // première image gardée dans le GIF
   take: 258,        // nombre d'images gardées (258 / 25 fps = 10,3 s)
   gifFps: 12.5,     // cadence du GIF (délai de 8 centièmes, valeur entière)
   gifWidth: 480,    // largeur finale
   colors: 64,       // taille de la palette GIF
   out: join(ROOT, 'media', 'gameplay.gif'),
+  // --video : encode un MP4 au lieu du GIF, pour la bande-annonce Wavedash.
+  // Pleine resolution, pas de palette, pas de perte de cadence.
+  video: false,
+  videoOut: join(ROOT, 'media', 'trailer.mp4'),
+  crf: 18,          // qualite x264 : 18 est visuellement sans perte
   dry: false
 };
 for (const a of process.argv.slice(2)) {
   const [k, v] = a.replace(/^--/, '').split('=');
   if (k === 'dry') O.dry = true;
+  else if (k === 'video') { O.video = true; if (!process.argv.some(x => x.startsWith('--w='))) { O.w = 1280; O.h = 720; } }
   else if (k in O) O[k] = v === undefined ? true : (isNaN(+v) ? v : +v);
   else throw new Error(`option inconnue : ${a}`);
 }
@@ -248,11 +258,28 @@ if (O.dry) process.exit(0);
 // Le tramage ajoute du bruit, et le bruit ruine la compression du GIF.
 const filter = `fps=${O.gifFps},scale=${O.gifWidth}:-1:flags=area,split[a][b];` +
   `[a]palettegen=max_colors=${O.colors}:stats_mode=diff[p];[b][p]paletteuse=dither=none:diff_mode=rectangle`;
-execFileSync('ffmpeg', ['-y', '-v', 'error',
-  '-framerate', String(O.fps), '-start_number', String(O.from), '-i', join(FRAMES, 'f%05d.png'),
-  '-frames:v', String(O.take), '-vf', filter, '-loop', '0', O.out], { stdio: 'inherit' });
+const target = O.video ? O.videoOut : O.out;
+if (O.video) {
+  // yuv420p pour que tous les lecteurs suivent, faststart pour que la lecture
+  // demarre sans avoir telecharge le fichier entier.
+  execFileSync('ffmpeg', ['-y', '-v', 'error',
+    '-framerate', String(O.fps), '-start_number', String(O.from), '-i', join(FRAMES, 'f%05d.png'),
+    '-frames:v', String(O.take),
+    '-c:v', 'libx264', '-preset', 'slow', '-crf', String(O.crf),
+    '-pix_fmt', 'yuv420p', '-movflags', '+faststart',
+    target], { stdio: 'inherit' });
+} else {
+  execFileSync('ffmpeg', ['-y', '-v', 'error',
+    '-framerate', String(O.fps), '-start_number', String(O.from), '-i', join(FRAMES, 'f%05d.png'),
+    '-frames:v', String(O.take), '-vf', filter, '-loop', '0', target], { stdio: 'inherit' });
+}
 rmSync(FRAMES, { recursive: true, force: true });
 
-const ko = statSync(O.out).size / 1024;
-console.log(`\n  ${O.out}`);
-console.log(`  ${O.gifWidth} px de large, ${(O.take / O.fps).toFixed(1)} s, ${(ko / 1024).toFixed(2)} Mo\n`);
+const ko = statSync(target).size / 1024;
+console.log(`\n  ${target}`);
+if (O.video) {
+  console.log(`  ${O.w}x${O.h}, ${(O.take / O.fps).toFixed(1)} s, ${(ko / 1024).toFixed(2)} Mo, sans son`);
+  console.log(`  (le harnais neutralise l'AudioContext : la musique du jeu n'est pas capturee)\n`);
+} else {
+  console.log(`  ${O.gifWidth} px de large, ${(O.take / O.fps).toFixed(1)} s, ${(ko / 1024).toFixed(2)} Mo\n`);
+}

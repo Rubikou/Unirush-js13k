@@ -75,13 +75,15 @@ var score=0, combo=0, comboT=0, newRec=0, endT=0, ended=0, freed=[];
 // Regle js13k "Be neighbourly" : tous les jeux du site partagent la meme origine,
 // donc la cle localStorage doit porter un prefixe unique au jeu. Jamais de localStorage.clear().
 function loadBest(){ try{ return +localStorage.unirushBest||0; }catch(e){ return 0; } }
-function saveBest(v){ try{ localStorage.unirushBest=v; }catch(e){} }
+function saveBest(v){ try{ localStorage.unirushBest=v; }catch(e){} cloudSave(v); }
 var best=loadBest();
 var shake=0, flash=0, flashCol='#fff', T=0, msg='', msgT=0;
 var parts=[], shoot=[], bg=null;
 var zoms=[], zT=0, zsub=0, ZSTEP=.38, tickN=0, fx=[], deathMsg='';
 var rings=[], texts=[], freeze=0, punch=0, popI=-1, popT=0, sparkT=0, danger=0;
 var respawn=[], REVIVE=10, nearT=0, miss=0;
+var runT=0, kills=0;          // chrono de la partie (s) et zombies detruits, pour les classements
+var achMsg='', achT=0, achSeen={};   // bandeau de trophee : texte, temps restant, deja vus cette session
 var colr=1, bridgeT=0, bridgeMid=0, newBg=null;   // zombies detruits, en attente de retour
 
 // ==========================================================================
@@ -506,6 +508,10 @@ function crash(z,i){
   snd(z.boss?70:150,.35,'sawtooth',.06);
   setTimeout(function(){ snd(z.boss?50:110,.3,'square',.05); },110);
   respawn.push({t:REVIVE,big:z.big,boss:z.boss});
+  kills++;
+  if(kills===1) A('FIRST_BLOOD');
+  if(kills===10) A('ZOMBIE_HUNTER');
+  if(z.boss) A('BOSS_DOWN');
 }
 function moveZoms(){
   tickN++;
@@ -620,11 +626,12 @@ function startLevel(n){
   candies=[]; fillCandies(); retune(); miss=0; nearT=0;
   zoms=[]; fx=[]; rings=[]; texts=[]; respawn=[]; freed=[]; zT=0; zsub=0; tickN=0; freeze=0; punch=0; danger=0; endT=0; ended=0; combo=0; comboT=0;
   ZSTEP=Math.max(.20,.40-(n-1)*.022);
+  if(n===4) A('HALFWAY_THERE');
   if(n===7) spawnZom(1,1);   // le boss est la des la premiere seconde du niveau 7
   syncZoms();                // et tous les zombies du niveau aussi
   msg='LEVEL '+n+' : '+WORLDS[world].n; msgT=2.6;
 }
-function newGame(){ eaten=0; score=0; combo=0; newRec=0; freed=[]; lives=3; deathMsg=''; startLevel(1); mode='play'; }
+function newGame(){ eaten=0; score=0; combo=0; newRec=0; freed=[]; lives=3; deathMsg=''; runT=0; kills=0; startLevel(1); mode='play'; }
 
 function step(){
   prevSnake=snake.map(function(s){ return {x:s.x,y:s.y}; });
@@ -677,7 +684,7 @@ function good(){
   if(target>6){ target=0;
     // Arc-en-ciel complet : le jeu s'arrete NET. On ne peut plus mourir apres coup.
     score+=100; flyText(hx,hy-CELL*2.2,'+100','#ffd76a',1);
-    if(!miss){ score+=200; flyText(hx,hy-CELL*3,'PERFECT!  +200','#ffd76a',1);
+    if(!miss){ score+=200; flyText(hx,hy-CELL*3,'PERFECT!  +200','#ffd76a',1); A('PERFECT_RAINBOW');
       confetti(40,1); snd(1200,.3,'triangle',.05); }
     fanfare(); shake=Math.min(shake+8,14); msg=''; msgT=0; punch=1.6; flash=.5; flashCol='#ffffff';
     for(var i=0;i<7;i++){ burstAt(hx,hy,RB[i],12);
@@ -709,7 +716,15 @@ function bad(c){
 function checkRec(){ newRec=0;
   if(score>best){ best=score; saveBest(best); newRec=1; confetti(70,1);
     snd(700,.3,'triangle',.05); setTimeout(function(){ snd(1050,.4,'triangle',.05); },160); } }
-function finishWin(){ mode='win'; T=0; checkRec(); }
+function finishWin(){ mode='win'; T=0; checkRec();
+  LB(0,runT*1e3|0);                        // temps du run complet
+  if(lives>2){ LB(1,runT*1e3|0); LB(2,kills); LB(3,kills); }   // jamais touche de la partie
+  A('RAINBOW_FREED');
+  if(lives>2) A('FLAWLESS');
+  if(lives===1) A('LAST_HOPE');            // fini sur la derniere vie
+  if(!kills) A('PACIFIST');                // pas un seul zombie touche
+  if(runT<SPEED) A('SPEED_OF_LIGHT');
+}
 function drawMini(x,y,sz,i){
   var bob=Math.abs(Math.sin(T*5+i))*sz*.35; y-=bob;
   X.fillStyle='rgba(0,0,0,.25)'; X.beginPath(); X.ellipse(x,y+bob+sz*.7,sz*.7,sz*.2,0,0,6.283); X.fill();
@@ -755,6 +770,7 @@ function die(){
   ring(hx,hy,'#ff3030',CELL*.3,CELL*5,.8,8);
   ring(hx,hy,'#ffffff',CELL*.2,CELL*2.4,.4,4);
   snd(300,.6,'sawtooth',.07); setTimeout(function(){ snd(140,.8,'square',.06); },180);
+  if(lives===2) LB(2,kills);               // premiere vie perdue : le run "sans etre touche" s'arrete ici
   if(lives>0) mode='dead';                 // on recommence le meme monde
   else { mode='over'; checkRec(); }
 }
@@ -767,6 +783,7 @@ function update(dt){
   if(shake>0){ shake-=dt*26; if(shake<0) shake=0; }
   if(flash>0){ flash-=dt*1.6; if(flash<0) flash=0; }
   if(msgT>0) msgT-=dt;
+  if(achT>0) achT-=dt;
   if(comboT>0) comboT-=dt;
   // la bulle de couleur : elle grandit avec l'arc-en-ciel, pleine sur les ecrans
   var cg=(mode==='play'||mode==='dead')?target/7:1; colr+=(cg-colr)*Math.min(1,dt*2.5);
@@ -788,6 +805,7 @@ function update(dt){
     return;
   }
   if(mode!=='play') return;
+  runT+=dt;
   if(freeze>0){ freeze-=dt; return; }        // arret sur image : ca claque a l'impact
   stepT+=dt;
   while(stepT>=STEP){ stepT-=STEP; step(); if(mode!=='play') return; }
@@ -1101,6 +1119,24 @@ function drawMsg(){
   X.restore(); X.textAlign='left';
 }
 
+// Bandeau de trophee, en haut. Le HUD occupe le coin haut gauche, d'ou le
+// decalage vertical et le contour epais qui le garde lisible par-dessus.
+function drawAch(){
+  if(achT<=0) return;
+  var a=Math.min(1,achT*1.6), fs=Math.max(15,Math.min(23,W*.029));
+  X.save(); X.textAlign='center'; X.globalAlpha=a;
+  X.font='bold '+fs+'px system-ui,sans-serif';
+  var bw=Math.min(W-24,X.measureText(achMsg).width+64),
+      bx=(W-bw)/2, by=8-(1-Math.min(1,(3.4-achT)*6))*26;    // il descend en entrant
+  rrect(X,bx,by,bw,58,12);
+  X.fillStyle='rgba(10,7,18,.86)'; X.fill();
+  X.strokeStyle='#ffd76a'; X.lineWidth=2; X.stroke();
+  X.fillStyle='#ffd76a'; X.fillText(achMsg,W/2,by+44);
+  X.globalAlpha=a*.65; X.fillStyle='#fff';
+  X.font='bold 10px system-ui,sans-serif'; X.fillText('T R O P H Y',W/2,by+18);
+  X.restore(); X.textAlign='left';
+}
+
 function rainbowArc(px,py,r){
   X.save(); X.lineWidth=r*.11;
   for(var i=0;i<7;i++){ var w=Math.max(0,Math.min(1,T*1.6-i*.16));   // il se dessine tout seul
@@ -1138,6 +1174,7 @@ function render(){
   if(flash>0){ X.save(); X.globalCompositeOperation='lighter'; X.globalAlpha=flash*.5;
     X.fillStyle=flashCol; X.fillRect(0,0,W,H); X.restore(); }
   if(mode!=='title'&&mode!=='levelup'){ drawHUD(); drawMsg(); }
+  drawAch();
   if(mode==='ending'){
     X.textAlign='center';
     if(!ended){ var a=.5+Math.sin(T*6)*.5;
@@ -1243,4 +1280,162 @@ var last=0;
 function loop(t){ var dt=Math.min(.05,(t-last)/1000)||0; last=t;
   update(dt); render(); requestAnimationFrame(loop); }
 requestAnimationFrame(loop);
+
+// ==========================================================================
+//  WAVEDASH  (challenge js13kGames)
+//  La plateforme injecte le global `Wavedash` avant notre code. Ailleurs
+//  (js13kgames.com, fichier local) il n'existe pas : tout ce bloc devient
+//  inerte, le jeu tourne exactement pareil et la console reste vide.
+// ==========================================================================
+var WD=self.Wavedash;
+
+// Les quatre classements. 0-1 = temps (croissant, en ms), 2-3 = zombies (decroissant).
+var LBN=['fastest-run','fastest-flawless-run','zombies-before-first-hit','zombies-flawless-run'];
+// Seuil du speedrun, en secondes de temps de jeu effectif.
+// Mesure (8 graines, autopilote de scripts/record-gif.mjs) : le plancher
+// theorique du jeu -- distance a parcourir x vitesse du serpent, chemin
+// toujours libre -- est de 80 s en moyenne, l'autopilote boucle en 89 s.
+// Une mort relance le niveau et coute ~11 s, donc 100 s exige un run propre.
+var SPEED=100;
+
+// Rien de ce bloc n'a le droit de casser la partie : une methode disparue du SDK,
+// un joueur deconnecte ou un reseau coupe doivent rester sans effet visible.
+function nop(){}
+function guard(f){ if(WD) try{ var q=f(); if(q&&q.catch) q.catch(nop); }catch(e){} }
+
+// Les trophees. setAchievement est synchrone ; le SDK ne repersiste pas un
+// trophee deja debloque, mais storeNow=true declenche quand meme un flush
+// reseau a chaque appel : le getAchievement en amont evite ce bruit.
+// A savoir : setAchievement ne fait rien tant que requestStats() n'a pas
+// repondu, et rien non plus pour un identifiant absent du Developer Portal.
+function A(i){
+  guard(function(){ WD.getAchievement&&WD.getAchievement(i)||WD.setAchievement(i,!0); });
+  if(achSeen[i]) return;                   // une seule celebration par chargement
+  achSeen[i]=1; achMsg=i.replace(/_/g,' '); achT=3.4;
+  snd(1050,.18,'triangle',.045); setTimeout(function(){ snd(1400,.3,'triangle',.04); },130);
+}
+
+function LB(i,v){ guard(function(){
+  return WD.getOrCreateLeaderboard(LBN[i],i<2?0:1,i<2?2:0).then(function(r){
+    if(r&&r.success) WD.uploadLeaderboardScore(r.data.id,v,true); }); }); }
+
+// Sauvegarde cloud du meilleur score : un fichier par joueur, synchronise entre
+// ses appareils. Le localStorage reste le filet quand Wavedash n'est pas la.
+var SF='best';
+function cloudSave(v){ guard(function(){
+  return WD.writeLocalFile(SF,new TextEncoder().encode(''+v)).then(function(){
+    return WD.uploadRemoteFile(SF); }); }); }
+function cloudLoad(){ guard(function(){
+  return WD.downloadRemoteFile(SF).then(function(r){
+    return r&&r.success&&WD.readLocalFile(SF); }).then(function(b){
+    if(b){ var v=+new TextDecoder().decode(b.data||b)||0; if(v>best) best=v; } }); }); }
+
+// init() doit passer avant tout autre appel SDK : c'est lui qui sort le jeu
+// de l'ecran de chargement Wavedash.
+// Un guard par appel : si le SDK perdait une de ces methodes, les autres
+// doivent continuer a passer. init() d'abord, c'est lui qui revele le jeu.
+guard(function(){ WD.init(); });
+guard(function(){ WD.requestStats(); });
+cloudLoad();
+
+/*DEV*/
+// ==========================================================================
+//  PANNEAU DE DEV  --  n'existe que dans src/index.html.
+//  scripts/build.js supprime tout ce bloc avant terser : zero octet dans le zip.
+//  Sert a declencher trophees et classements sans devoir finir le jeu.
+// ==========================================================================
+(function(){
+  var ACH=['FIRST_BLOOD','PERFECT_RAINBOW','HALFWAY_THERE','BOSS_DOWN','ZOMBIE_HUNTER',
+           'RAINBOW_FREED','FLAWLESS','SPEED_OF_LIGHT','PACIFIST','LAST_HOPE'];
+  var LBS=[['fastest-run',0,2],['fastest-flawless-run',0,2],
+           ['zombies-before-first-hit',1,0],['zombies-flawless-run',1,0]];
+
+  var box=document.createElement('div');
+  box.style.cssText='position:fixed;right:8px;bottom:8px;width:290px;max-height:92vh;overflow:auto;'+
+    'z-index:9;background:#12101acc;backdrop-filter:blur(6px);color:#eee;font:11px/1.45 ui-monospace,monospace;'+
+    'padding:10px;border:1px solid #ffffff22;border-radius:8px';
+  document.body.appendChild(box);
+
+  function h(html){ var d=document.createElement('div'); d.innerHTML=html; return d; }
+  function log(t,ok){ out.insertBefore(h('<span style="color:'+(ok===0?'#ff8080':ok===1?'#88e0a0':'#c9c4d4')+'">'+t+'</span>'),out.firstChild);
+    while(out.children.length>40) out.removeChild(out.lastChild); }
+  function btn(label,fn,col){
+    var b=document.createElement('button');
+    b.textContent=label;
+    b.style.cssText='margin:2px 2px 0 0;padding:3px 6px;font:10px ui-monospace,monospace;cursor:pointer;'+
+      'background:'+(col||'#2a2536')+';color:#eee;border:1px solid #ffffff26;border-radius:4px';
+    b.onclick=fn; return b;
+  }
+  function title(t){ var d=h('<div style="margin:8px 0 3px;color:#ffd76a;font-weight:700">'+t+'</div>'); box.appendChild(d); }
+
+  box.appendChild(h('<b style="color:#ffd76a">DEV PANEL</b> <span style="color:#8a8496">(absent du zip)</span>'));
+
+  // --- etat du SDK ---
+  title('SDK');
+  var st=h('<div style="color:#c9c4d4">...</div>'); box.appendChild(st);
+  function refresh(){
+    var W=window.Wavedash;
+    st.innerHTML = !W ? '<span style="color:#ff8080">Wavedash absent</span> (normal hors plateforme : le jeu doit tourner pareil)'
+      : 'init '+W.initialized+' | revele '+W.gameLoaded+' | events '+W.eventsReady;
+  }
+  refresh(); setInterval(refresh,1000);
+  box.appendChild(btn('requestStats',function(){
+    var W=window.Wavedash; if(!W) return log('pas de SDK',0);
+    W.requestStats().then(function(r){ log('requestStats -> '+JSON.stringify(r&&r.success!==undefined?r.success:r),1); refresh(); });
+  }));
+  box.appendChild(btn('etat des trophees',function(){
+    var W=window.Wavedash; if(!W) return log('pas de SDK',0);
+    ACH.forEach(function(i){ log(i+' : '+W.getAchievement(i), W.getAchievement(i)?1:undefined); });
+  }));
+
+  // --- trophees ---
+  title('Trophees (bandeau + envoi SDK)');
+  ACH.forEach(function(i){ box.appendChild(btn(i,function(){ A(i); log('A('+i+')',1); })); });
+  box.appendChild(btn('rejouer les bandeaux',function(){ achSeen={}; log('achSeen vide',1); },'#3a2b46'));
+
+  // --- classements ---
+  title('Classements');
+  box.appendChild(btn('lesquels existent ?',function(){
+    var W=window.Wavedash; if(!W) return log('pas de SDK',0);
+    LBS.forEach(function(l){ W.getLeaderboard(l[0]).then(function(r){ log(l[0]+' : '+(r.success?'existe':'ABSENT'), r.success?1:0); }); });
+  }));
+  box.appendChild(btn('creer les 4',function(){
+    var W=window.Wavedash; if(!W) return log('pas de SDK',0);
+    LBS.forEach(function(l){ W.getOrCreateLeaderboard(l[0],l[1],l[2]).then(function(r){ log('cree '+l[0]+' : '+(r.success?'ok':r.message), r.success?1:0); }); });
+  },'#3a2b46'));
+
+  // --- scenarios de fin de partie ---
+  title('Scenarios');
+  var f=h('<div>vies <input id="dvL" value="3" style="width:26px"> '+
+          'kills <input id="dvK" value="7" style="width:32px"> '+
+          'temps(s) <input id="dvT" value="90" style="width:38px"></div>');
+  f.querySelectorAll('input').forEach(function(i){
+    i.style.cssText='background:#0c0a12;color:#eee;border:1px solid #ffffff26;border-radius:3px;font:10px ui-monospace,monospace;padding:1px 3px'; });
+  box.appendChild(f);
+  function setup(){
+    newGame();
+    lives=+document.getElementById('dvL').value;
+    kills=+document.getElementById('dvK').value;
+    runT=+document.getElementById('dvT').value;
+  }
+  box.appendChild(btn('VICTOIRE',function(){ setup(); finishWin();
+    log('finishWin() vies='+lives+' kills='+kills+' t='+runT,1); },'#2f4a34'));
+  box.appendChild(btn('1re mort',function(){ newGame(); kills=+document.getElementById('dvK').value;
+    deathMsg='DEV'; die(); log('die() -> zombies-before-first-hit avec '+kills,1); },'#4a2f2f'));
+  box.appendChild(btn('sauver le best',function(){ var v=Date.now()%9000+1000;
+    best=v; saveBest(v); log('saveBest('+v+') -> cloud + localStorage',1); },'#2f3a4a'));
+  box.appendChild(btn('lire le save cloud',function(){
+    var W=window.Wavedash; if(!W) return log('pas de SDK',0);
+    W.downloadRemoteFile('best').then(function(r){
+      if(!r.success) return log('pas de save cloud : '+r.message,0);
+      return W.readLocalFile('best').then(function(b){
+        log('cloud best = '+new TextDecoder().decode(b&&b.data||b),1); });
+    });
+  }));
+
+  title('Journal');
+  var out=h('<div style="color:#c9c4d4"></div>'); box.appendChild(out);
+  log('pret');
+})();
+/*/DEV*/
 </script></body></html>
