@@ -75,13 +75,14 @@ var score=0, combo=0, comboT=0, newRec=0, endT=0, ended=0, freed=[];
 // Regle js13k "Be neighbourly" : tous les jeux du site partagent la meme origine,
 // donc la cle localStorage doit porter un prefixe unique au jeu. Jamais de localStorage.clear().
 function loadBest(){ try{ return +localStorage.unirushBest||0; }catch(e){ return 0; } }
-function saveBest(v){ try{ localStorage.unirushBest=v; }catch(e){} }
+function saveBest(v){ try{ localStorage.unirushBest=v; }catch(e){} cloudSave(v); }
 var best=loadBest();
 var shake=0, flash=0, flashCol='#fff', T=0, msg='', msgT=0;
 var parts=[], shoot=[], bg=null;
 var zoms=[], zT=0, zsub=0, ZSTEP=.38, tickN=0, fx=[], deathMsg='';
 var rings=[], texts=[], freeze=0, punch=0, popI=-1, popT=0, sparkT=0, danger=0;
 var respawn=[], REVIVE=10, nearT=0, miss=0;
+var runT=0, kills=0;          // chrono de la partie (s) et zombies detruits, pour les classements
 var colr=1, bridgeT=0, bridgeMid=0, newBg=null;   // zombies detruits, en attente de retour
 
 // ==========================================================================
@@ -506,6 +507,7 @@ function crash(z,i){
   snd(z.boss?70:150,.35,'sawtooth',.06);
   setTimeout(function(){ snd(z.boss?50:110,.3,'square',.05); },110);
   respawn.push({t:REVIVE,big:z.big,boss:z.boss});
+  kills++;
 }
 function moveZoms(){
   tickN++;
@@ -624,7 +626,7 @@ function startLevel(n){
   syncZoms();                // et tous les zombies du niveau aussi
   msg='LEVEL '+n+' : '+WORLDS[world].n; msgT=2.6;
 }
-function newGame(){ eaten=0; score=0; combo=0; newRec=0; freed=[]; lives=3; deathMsg=''; startLevel(1); mode='play'; }
+function newGame(){ eaten=0; score=0; combo=0; newRec=0; freed=[]; lives=3; deathMsg=''; runT=0; kills=0; startLevel(1); mode='play'; }
 
 function step(){
   prevSnake=snake.map(function(s){ return {x:s.x,y:s.y}; });
@@ -709,7 +711,10 @@ function bad(c){
 function checkRec(){ newRec=0;
   if(score>best){ best=score; saveBest(best); newRec=1; confetti(70,1);
     snd(700,.3,'triangle',.05); setTimeout(function(){ snd(1050,.4,'triangle',.05); },160); } }
-function finishWin(){ mode='win'; T=0; checkRec(); }
+function finishWin(){ mode='win'; T=0; checkRec();
+  LB(0,runT*1e3|0);                        // temps du run complet
+  if(lives>2){ LB(1,runT*1e3|0); LB(2,kills); LB(3,kills); }   // jamais touche de la partie
+}
 function drawMini(x,y,sz,i){
   var bob=Math.abs(Math.sin(T*5+i))*sz*.35; y-=bob;
   X.fillStyle='rgba(0,0,0,.25)'; X.beginPath(); X.ellipse(x,y+bob+sz*.7,sz*.7,sz*.2,0,0,6.283); X.fill();
@@ -755,6 +760,7 @@ function die(){
   ring(hx,hy,'#ff3030',CELL*.3,CELL*5,.8,8);
   ring(hx,hy,'#ffffff',CELL*.2,CELL*2.4,.4,4);
   snd(300,.6,'sawtooth',.07); setTimeout(function(){ snd(140,.8,'square',.06); },180);
+  if(lives===2) LB(2,kills);               // premiere vie perdue : le run "sans etre touche" s'arrete ici
   if(lives>0) mode='dead';                 // on recommence le meme monde
   else { mode='over'; checkRec(); }
 }
@@ -788,6 +794,7 @@ function update(dt){
     return;
   }
   if(mode!=='play') return;
+  runT+=dt;
   if(freeze>0){ freeze-=dt; return; }        // arret sur image : ca claque a l'impact
   stepT+=dt;
   while(stepT>=STEP){ stepT-=STEP; step(); if(mode!=='play') return; }
@@ -1243,4 +1250,39 @@ var last=0;
 function loop(t){ var dt=Math.min(.05,(t-last)/1000)||0; last=t;
   update(dt); render(); requestAnimationFrame(loop); }
 requestAnimationFrame(loop);
+
+// ==========================================================================
+//  WAVEDASH  (challenge js13kGames)
+//  La plateforme injecte le global `Wavedash` avant notre code. Ailleurs
+//  (js13kgames.com, fichier local) il n'existe pas : tout ce bloc devient
+//  inerte, le jeu tourne exactement pareil et la console reste vide.
+// ==========================================================================
+var WD=self.Wavedash;
+
+// Les quatre classements. 0-1 = temps (croissant, en ms), 2-3 = zombies (decroissant).
+var LBN=['fastest-run','fastest-flawless-run','zombies-before-first-hit','zombies-flawless-run'];
+
+// Rien de ce bloc n'a le droit de casser la partie : une methode disparue du SDK,
+// un joueur deconnecte ou un reseau coupe doivent rester sans effet visible.
+function nop(){}
+function guard(f){ if(WD) try{ var q=f(); if(q&&q.catch) q.catch(nop); }catch(e){} }
+
+function LB(i,v){ guard(function(){
+  return WD.getOrCreateLeaderboard(LBN[i],i<2?0:1,i<2?2:0).then(function(r){
+    if(r&&r.success) WD.uploadLeaderboardScore(r.data.id,v,true); }); }); }
+
+// Sauvegarde cloud du meilleur score : un fichier par joueur, synchronise entre
+// ses appareils. Le localStorage reste le filet quand Wavedash n'est pas la.
+var SF='best';
+function cloudSave(v){ guard(function(){
+  return WD.writeLocalFile(SF,new TextEncoder().encode(''+v)).then(function(){
+    return WD.uploadRemoteFile(SF); }); }); }
+function cloudLoad(){ guard(function(){
+  return WD.downloadRemoteFile(SF).then(function(r){
+    return r&&r.success&&WD.readLocalFile(SF); }).then(function(b){
+    if(b){ var v=+new TextDecoder().decode(b.data||b)||0; if(v>best) best=v; } }); }); }
+
+// init() doit passer avant tout autre appel SDK : c'est lui qui sort le jeu
+// de l'ecran de chargement Wavedash.
+guard(function(){ WD.init(); cloudLoad(); });
 </script></body></html>

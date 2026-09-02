@@ -111,7 +111,16 @@ function build() {
   // 5. zip
   rmSync(ZIP, { force: true });
   execFileSync('zip', ['-9', '-q', '-j', ZIP, join(DIST, 'index.html')]);
+  // 6. advzip : recompresse le flux deflate du zip (zopfli). Meme contenu, moins d'octets.
+  //    Optionnel : si advancecomp n'est pas installe, on garde le zip de l'etape 5.
+  let zipBefore = statSync(ZIP).size;
+  try {
+    execFileSync('advzip', ['-z', '-4', '-i', '200', '-q', ZIP]);
+  } catch (e) {
+    console.log('  (advzip absent : brew install advancecomp pour gagner ~380 o)');
+  }
   const zipSize = statSync(ZIP).size;
+  if (zipSize < zipBefore) console.log(`  advzip           -${zipBefore - zipSize} o`);
 
   // rapport
   const pct = (n) => `${String(n).padStart(6)} o`;
