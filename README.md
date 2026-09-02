@@ -119,6 +119,14 @@ The build chain is in `scripts/build.js`:
 
 1. The `<style>` and `<script>` are pulled out of `src/index.html`.
 2. **terser** minifies the JavaScript (3 passes, top-level mangling).
+   Note what is *not* enabled: `booleans_as_integers`. It rewrites `true` as
+   `1`, which is free everywhere except at an API boundary that type-checks its
+   arguments. The Wavedash SDK does exactly that, so `setAchievement(id, !0)`
+   became `setAchievement(id, 1)`, the SDK threw, our guard swallowed it, and
+   no trophy or score was ever sent. Only from the build, never from
+   `src/index.html`, which is the nastiest shape a bug can take here. It costs
+   17 B of terser output to leave the flag off, and about 1 B once roadroller
+   and advzip have had their turn.
 3. **roadroller** re-encodes the minified JS into a self-extracting bundle.
    It is run with `-O2`, which searches for the best parameters. This is the
    single biggest win in the chain: it roughly cuts the terser output by two

@@ -43,8 +43,13 @@ const BEST = Math.max(1, +(args.find(a => a.startsWith('--best='))?.slice(7) || 
 /* Reglages de compression. C'est ici qu'on tourne les boutons.        */
 /* ------------------------------------------------------------------ */
 
+// booleans_as_integers est volontairement ABSENT : il reecrit `true` en `1`, et
+// le SDK Wavedash valide ses arguments (vBoolean fait un typeof strict). Avec
+// l'option, setAchievement(i,!0) devenait setAchievement(i,1), le SDK levait une
+// erreur, notre guard l'avalait, et plus aucun trophee ni score ne partait --
+// mais uniquement dans le build, jamais depuis src/index.html. Cout : 17 o.
 const TERSER_ARGS = [
-  '--compress', 'passes=3,unsafe=true,unsafe_math=true,booleans_as_integers=true',
+  '--compress', 'passes=3,unsafe=true,unsafe_math=true',
   '--mangle',   'toplevel=true',
   '--format',   'quote_style=1,semicolons=true'
 ];
