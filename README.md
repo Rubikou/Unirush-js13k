@@ -48,6 +48,48 @@ Arrow keys, WASD/ZQSD, or swipe on mobile.
   whole Rainbow Fanfare.
 - There is a real ending. Beat world 7 and find out what the zombies were.
 
+### Trophies
+
+Ten of them, and they work everywhere the game does. The banner that announces
+them is drawn on the canvas, so it shows up on js13kgames.com, on Wavedash and
+on a file you opened from your disk alike. When the Wavedash SDK is around the
+trophy is also stored on your account; when it is not, nothing happens and the
+banner shows anyway.
+
+| Trophy | How you get it |
+|---|---|
+| First Blood | Crash your first zombie into your rainbow trail |
+| Perfect Rainbow | Complete a whole rainbow without eating a single wrong candy |
+| Halfway There | Reach world 4 |
+| Boss Down | Take down the boss that guards the seventh world |
+| Zombie Hunter | Crash 10 zombies in a single run |
+| Rainbow Freed | Finish the game |
+| Flawless | Finish the game without losing a single life |
+| Speed of Light | Finish the game in under 100 seconds |
+| Pacifist | Finish the game without crashing a single zombie |
+| Last Hope | Finish the game on your very last life |
+
+Pacifist and Zombie Hunter pull in opposite directions on purpose: one rewards
+never touching a zombie, the other rewards hunting ten of them.
+
+The label on the banner is derived from the trophy id, so `FIRST_BLOOD` prints
+as FIRST BLOOD. Carrying a second table of display names would have cost more
+than the budget had left. That is also why two ids read oddly for an identifier
+and perfectly for a banner: `SPEED_OF_LIGHT` and `HALFWAY_THERE`.
+
+Unlocks are remembered in memory, not on disk, so a trophy congratulates you
+again after a page reload. On Wavedash the account keeps the real record; the
+banner is a celebration, not a save file.
+
+About the 100 second threshold: an autopilot with near-optimal pathfinding
+finishes in 83 to 97 s across eight seeds when it does not die, and the
+theoretical floor of the game, the distance to cover multiplied by the snake's
+speed with a clear path throughout, averages 80 s over six seeds. The autopilot
+is therefore already within 11 % of the floor: the time is set by how far you
+have to travel and how fast the snake moves, not by how well you play. A death
+restarts the level and costs about 11 s. At 120 s the trophy would have come
+free with any finish; 100 s asks for a clean run.
+
 ---
 
 ## Running it
@@ -65,6 +107,7 @@ Extra build options:
 
 ```bash
 npm run build -- --no-rr    # skip roadroller (fast, for quick size checks)
+npm run build -- --best=6   # run roadroller 6 times, keep the smallest zip
 npm run watch               # rebuild on every save
 ```
 
@@ -83,22 +126,32 @@ The build chain is in `scripts/build.js`:
 4. A minimal HTML shell is rebuilt around it: no `<html>`, no `<head>`,
    no `<body>`, since browsers insert those anyway.
 5. `zip -9`.
+6. **advzip** recompresses the zip's deflate stream with zopfli. Same bytes
+   inside, about 390 fewer outside. It is optional: without
+   `brew install advancecomp` the build just keeps the zip from step 5.
+
+The dev panel at the bottom of `src/index.html` is stripped before terser even
+sees it, so none of its 5 402 B can reach the zip.
 
 Measured on the current build:
 
 | Stage | Size |
 |---|---|
-| Readable source (JS only) | 67 587 B |
-| After terser | 45 848 B |
-| After roadroller | 16 390 B |
-| Final HTML | 16 811 B |
-| Final zip | **13 073 B** of 13 312 max |
+| Readable source (JS only, dev panel already stripped) | 72 458 B |
+| After terser | 47 792 B |
+| After roadroller | 17 168 B |
+| Final HTML | 17 581 B |
+| After `zip -9` | 13 646 B |
+| After advzip | **13 254 B** of 13 312 max |
 
-The zip size moves by a few dozen bytes between builds: `roadroller -O2` runs a
-randomised parameter search, so the same source has produced 13 028, 13 057,
-13 069 and 13 073 B on different runs. The lockfile pins the tool versions, not
-the output size. With the margin this thin, always read the number the build
-prints rather than trusting one written down here.
+The same source does not produce the same zip twice. `roadroller -O2` runs a
+randomised parameter search, so two builds of an identical `src/index.html`
+came out at 13 249 and 13 267 B. That 18 B swing is a real risk when under
+60 B are left, so `--best=N` runs roadroller N times and keeps the smallest
+draw. Over six draws the roadroller output spanned 33 B.
+
+Build the zip you submit with `--best`. Never trust a margin written down
+here; read the number the build prints.
 
 If the build ever goes over budget it exits with a non-zero status, so it can
 be wired into CI.
@@ -115,6 +168,8 @@ unirush/
 ├─ scripts/record-gif.mjs replays a seeded game on autopilot -> media/gameplay.gif
 ├─ package.json          build scripts and the two dev dependencies
 ├─ package-lock.json     pins terser and roadroller versions
+├─ wavedash.toml         which game to upload to, and from which folder
+├─ wavedash-achievements.json  the ten trophies, in the portal's import format
 ├─ .nvmrc                Node 18
 ├─ .gitignore
 ├─ media/                the GIF shown at the top of this README
@@ -132,9 +187,9 @@ and where this project stands:
 
 | Rule | Status |
 |---|---|
-| Zip must be 13 312 bytes or less | around 13 060 B, roughly 250 B to spare |
+| Zip must be 13 312 bytes or less | 13 254 B with `--best=6`, 58 B to spare |
 | `index.html` at the top level of the zip | one entry, no subfolder |
-| No external resources at all, everything inside the zip | no URL, no `fetch`, no external font |
+| No external resources at all, everything inside the zip | no URL, no `fetch`, no external font; the Wavedash block only reads a global the host injects, and loads nothing |
 | A GitHub repository with readable, unmangled source | `src/index.html` is the readable source |
 | The repo must contain what is needed to *build* the game, not just an unzipped copy | `scripts/build.js` + `package.json` + lockfile |
 | Works in latest Chrome and Firefox, with no console errors | measured: 0 errors, 0 warnings in both |
@@ -185,10 +240,20 @@ Measured across variants, all built from the same terser output:
 | 6 | 13 598 B | over the limit |
 | 4 | 14 941 B | over the limit |
 
-Nine contexts costs 71 bytes and decodes 29 % faster, and still fits with 168
-bytes to spare. That is the lever to pull if the upload test ever rejects the
-build for taking too long. If it does cut us off, the announcement says to get
-in touch with the organisers.
+Those decode timings still hold, but the zip column was measured before advzip
+and before the Wavedash block, so read it for the shape of the curve, not for
+the absolute numbers.
+
+The shape is what matters, and it has turned against us. Re-measured on the
+current source with roadroller settings held equal, dropping from 12 contexts
+to 9 costs 66 B. Only 58 B are left. **The decode-speed lever no longer fits.**
+Pulling it now means finding bytes elsewhere first; the cheapest is swapping
+`getOrCreateLeaderboard` for `getLeaderboard`, worth 15 to 20 B, and only safe
+once all four leaderboards exist, since the shorter call cannot create a
+missing one and scores would vanish in silence.
+
+If the upload test ever rejects the build for taking too long, the
+announcement says to get in touch with the organisers.
 
 The submission asks for two things: the **playable** zip, and the **readable**
 repository. Organisers clone the repo under the
@@ -196,11 +261,55 @@ repository. Organisers clone the repo under the
 can learn from it, which is why `src/index.html` is kept commented and
 unminified.
 
+### The Wavedash challenge
+
+Wavedash is a browser-game platform, and the 2026 competition adds it as a
+*challenge*: a checkbox on the same js13k entry, not a second submission. The
+rules give an extra week, to 20 September 2026, to deploy there and nothing
+else. No new features, no bugfixes in that week.
+
+One line of code is mandatory. The platform injects a `Wavedash` global before
+the game runs, and until `Wavedash.init()` is called the game stays hidden
+behind the platform's loading screen and never appears. Everything the SDK
+touches sits in one block at the bottom of `src/index.html`, guarded so that a
+missing global, a signed-out player or a dead network changes nothing and
+prints nothing. On js13kgames.com the whole block is inert.
+
+Leaderboards only exist there. They need a server, so unlike the trophies they
+have no meaning on js13kgames.com.
+
+| Leaderboard | Score | Sent when |
+|---|---|---|
+| `fastest-run` | run time, ascending | you finish the game |
+| `fastest-flawless-run` | run time, ascending | you finish without losing a life |
+| `zombies-before-first-hit` | zombies, descending | your first life is lost, or you finish untouched |
+| `zombies-flawless-run` | zombies, descending | you finish without losing a life |
+
+A leaderboard is created the first time a player meets its condition, so three
+of the four stay invisible on the game page until somebody actually finishes
+the game. Creating them up front in the Developer Portal, or through the dev
+panel's "create the 4" button, avoids a lone leaderboard on an otherwise empty
+page.
+
+The best score also rides on Wavedash's remote storage, synced across a
+player's devices, with `localStorage` as the fallback everywhere else.
+
+Two things the SDK's own docs do not say, found by reading its source:
+`setAchievement()` silently does nothing until `requestStats()` has answered,
+and nothing at all for an id that is absent from the Developer Portal. It
+returns `false` either way. `wavedash-achievements.json` holds the ten trophies
+in the portal's bulk-import format so the ids cannot drift apart.
+
+The dev panel at the bottom of `src/index.html` exists for all of this: it
+fires any trophy, forces a win with arbitrary lives, kills and run time, and
+reads the SDK state back. It is stripped from the build, so open the source
+file directly to use it.
+
 ### Before submitting
 
 ```bash
-npm run build                  # must print DANS LE BUDGET
-unzip -l unirush.zip   # must show exactly one index.html, no __MACOSX
+npm run build -- --best=6   # must print DANS LE BUDGET
+unzip -l unirush.zip        # must show exactly one index.html, no __MACOSX
 ```
 
 Then open `dist/index.html` in Chrome *and* Firefox, play a full world, and
