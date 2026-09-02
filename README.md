@@ -142,13 +142,17 @@ Measured on the current build:
 | After roadroller | 17 168 B |
 | Final HTML | 17 581 B |
 | After `zip -9` | 13 646 B |
-| After advzip | **13 254 B** of 13 312 max |
+| After advzip | **13 251 to 13 263 B** of 13 312 max |
 
 The same source does not produce the same zip twice. `roadroller -O2` runs a
-randomised parameter search, so two builds of an identical `src/index.html`
-came out at 13 249 and 13 267 B. That 18 B swing is a real risk when under
-60 B are left, so `--best=N` runs roadroller N times and keeps the smallest
-draw. Over six draws the roadroller output spanned 33 B.
+randomised parameter search, so two plain builds of an identical
+`src/index.html` came out at 13 249 and 13 267 B. That 18 B swing is a real
+risk when under 60 B are left, so `--best=N` runs roadroller N times and keeps
+the smallest draw. Over six draws the roadroller output spanned 33 B.
+
+`--best=6` does not remove the lottery, it only improves the odds: three runs
+of it landed on 13 251, 13 254 and 13 263 B. Plan on the worst of those, not
+the best. Raising N buys a little more, with diminishing returns.
 
 Build the zip you submit with `--best`. Never trust a margin written down
 here; read the number the build prints.
@@ -187,7 +191,7 @@ and where this project stands:
 
 | Rule | Status |
 |---|---|
-| Zip must be 13 312 bytes or less | 13 254 B with `--best=6`, 58 B to spare |
+| Zip must be 13 312 bytes or less | 13 251 to 13 263 B with `--best=6`, so 49 B to spare in the worst run seen |
 | `index.html` at the top level of the zip | one entry, no subfolder |
 | No external resources at all, everything inside the zip | no URL, no `fetch`, no external font; the Wavedash block only reads a global the host injects, and loads nothing |
 | A GitHub repository with readable, unmangled source | `src/index.html` is the readable source |
@@ -246,7 +250,8 @@ the absolute numbers.
 
 The shape is what matters, and it has turned against us. Re-measured on the
 current source with roadroller settings held equal, dropping from 12 contexts
-to 9 costs 66 B. Only 58 B are left. **The decode-speed lever no longer fits.**
+to 9 costs 66 B, and the worst `--best=6` run leaves 49.
+**The decode-speed lever no longer fits.**
 Pulling it now means finding bytes elsewhere first; the cheapest is swapping
 `getOrCreateLeaderboard` for `getLeaderboard`, worth 15 to 20 B, and only safe
 once all four leaderboards exist, since the shorter call cannot create a
