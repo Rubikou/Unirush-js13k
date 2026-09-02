@@ -45,6 +45,9 @@ yarn-error.log*
 .env.*
 !.env.example
 
+# --- Sorties du skill js13k-finalize ---
+.js13k-check/
+
 # --- Divers ---
 .cache/
 tmp/
