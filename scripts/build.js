@@ -15,6 +15,12 @@
  * Usage :  npm run build
  *          npm run build -- --watch     (reconstruit a chaque sauvegarde)
  *          npm run build -- --no-rr     (saute roadroller, plus rapide pour tester)
+ *          npm run build -- --best=6    (relance roadroller 6 fois, garde le plus petit)
+ *
+ * A savoir : roadroller -O2 tire ses parametres au hasard (~300 essais), donc deux
+ * builds de la MEME source ne donnent pas la meme taille -- 18 octets d'ecart
+ * mesures. Quand la marge est mince, --best transforme cette loterie en avantage
+ * en gardant le meilleur tirage. A utiliser pour le zip qu'on soumet.
  */
 
 import { readFileSync, writeFileSync, mkdirSync, rmSync, existsSync, watch, statSync } from 'node:fs';
@@ -31,6 +37,7 @@ const LIMIT = 13312;                       // 13 * 1024, la regle du concours
 const args = process.argv.slice(2);
 const WATCH = args.includes('--watch');
 const NO_RR = args.includes('--no-rr');
+const BEST = Math.max(1, +(args.find(a => a.startsWith('--best='))?.slice(7) || 1));
 
 /* ------------------------------------------------------------------ */
 /* Reglages de compression. C'est ici qu'on tourne les boutons.        */
@@ -98,8 +105,12 @@ function build() {
     const minJs = join(DIST, '_min.js');
     writeFileSync(minJs, out);
     try {
-      out = run('roadroller', [minJs, ...ROADROLLER_ARGS]);
-      sizeRR = Buffer.byteLength(out);
+      for (let i = 0; i < BEST; i++) {
+        const cand = run('roadroller', [minJs, ...ROADROLLER_ARGS]);
+        const n = Buffer.byteLength(cand);
+        if (i === 0 || n < sizeRR) { out = cand; sizeRR = n; }
+        if (BEST > 1) console.log(`  roadroller ${i + 1}/${BEST}  ${n} o${n === sizeRR ? '  <- garde' : ''}`);
+      }
     } catch (e) {
       console.warn('  roadroller a echoue, on garde la version terser.');
     }

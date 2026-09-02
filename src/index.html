@@ -1123,13 +1123,17 @@ function drawMsg(){
 // decalage vertical et le contour epais qui le garde lisible par-dessus.
 function drawAch(){
   if(achT<=0) return;
-  var a=Math.min(1,achT*1.6), y=Math.min(30+(1-Math.min(1,(3.4-achT)*6))*-14,30);
-  X.save(); X.globalAlpha=a; X.textAlign='center';
-  X.font='bold '+Math.max(15,Math.min(24,W*.03))+'px system-ui,sans-serif';
-  X.lineWidth=7; X.strokeStyle='rgba(0,0,0,.7)';
-  X.strokeText(achMsg,W/2,y+18); X.fillStyle='#ffd76a'; X.fillText(achMsg,W/2,y+18);
-  X.font='bold '+Math.max(9,Math.min(12,W*.015))+'px system-ui,sans-serif';
-  X.lineWidth=5; X.strokeText('TROPHY',W/2,y); X.fillStyle='#fff'; X.fillText('TROPHY',W/2,y);
+  var a=Math.min(1,achT*1.6), fs=Math.max(15,Math.min(23,W*.029));
+  X.save(); X.textAlign='center'; X.globalAlpha=a;
+  X.font='bold '+fs+'px system-ui,sans-serif';
+  var bw=Math.min(W-24,X.measureText(achMsg).width+64),
+      bx=(W-bw)/2, by=8-(1-Math.min(1,(3.4-achT)*6))*26;    // il descend en entrant
+  rrect(X,bx,by,bw,58,12);
+  X.fillStyle='rgba(10,7,18,.86)'; X.fill();
+  X.strokeStyle='#ffd76a'; X.lineWidth=2; X.stroke();
+  X.fillStyle='#ffd76a'; X.fillText(achMsg,W/2,by+44);
+  X.globalAlpha=a*.65; X.fillStyle='#fff';
+  X.font='bold 10px system-ui,sans-serif'; X.fillText('T R O P H Y',W/2,by+18);
   X.restore(); X.textAlign='left';
 }
 
