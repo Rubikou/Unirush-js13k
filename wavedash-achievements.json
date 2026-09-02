@@ -1,0 +1,65 @@
+{
+  "achievements": [
+    {
+      "identifier": "FIRST_BLOOD",
+      "display_name": "First Blood",
+      "description": "Crash your first zombie into your rainbow trail.",
+      "stat_requirement": null
+    },
+    {
+      "identifier": "PERFECT_RAINBOW",
+      "display_name": "Perfect Rainbow",
+      "description": "Complete a whole rainbow without eating a single wrong candy.",
+      "stat_requirement": null
+    },
+    {
+      "identifier": "HALFWAY",
+      "display_name": "Halfway There",
+      "description": "Reach world 4.",
+      "stat_requirement": null
+    },
+    {
+      "identifier": "BOSS_DOWN",
+      "display_name": "Boss Down",
+      "description": "Take down the boss that guards the seventh world.",
+      "stat_requirement": null
+    },
+    {
+      "identifier": "ZOMBIE_HUNTER",
+      "display_name": "Zombie Hunter",
+      "description": "Crash 10 zombies in a single run.",
+      "stat_requirement": null
+    },
+    {
+      "identifier": "RAINBOW_FREED",
+      "display_name": "Rainbow Freed",
+      "description": "Finish the game and give the world its colours back.",
+      "stat_requirement": null
+    },
+    {
+      "identifier": "FLAWLESS",
+      "display_name": "Flawless",
+      "description": "Finish the game without losing a single life.",
+      "stat_requirement": null
+    },
+    {
+      "identifier": "SPEEDRUN",
+      "display_name": "Speed of Light",
+      "description": "Finish the game in under 100 seconds.",
+      "stat_requirement": null
+    },
+    {
+      "identifier": "PACIFIST",
+      "display_name": "Pacifist",
+      "description": "Finish the game without crashing a single zombie.",
+      "stat_requirement": null
+    },
+    {
+      "identifier": "LAST_HOPE",
+      "display_name": "Last Hope",
+      "description": "Finish the game on your very last life.",
+      "stat_requirement": null
+    }
+  ],
+  "stats": []
+}

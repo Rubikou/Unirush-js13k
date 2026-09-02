@@ -508,6 +508,9 @@ function crash(z,i){
   setTimeout(function(){ snd(z.boss?50:110,.3,'square',.05); },110);
   respawn.push({t:REVIVE,big:z.big,boss:z.boss});
   kills++;
+  if(kills===1) A('FIRST_BLOOD');
+  if(kills===10) A('ZOMBIE_HUNTER');
+  if(z.boss) A('BOSS_DOWN');
 }
 function moveZoms(){
   tickN++;
@@ -622,6 +625,7 @@ function startLevel(n){
   candies=[]; fillCandies(); retune(); miss=0; nearT=0;
   zoms=[]; fx=[]; rings=[]; texts=[]; respawn=[]; freed=[]; zT=0; zsub=0; tickN=0; freeze=0; punch=0; danger=0; endT=0; ended=0; combo=0; comboT=0;
   ZSTEP=Math.max(.20,.40-(n-1)*.022);
+  if(n===4) A('HALFWAY');
   if(n===7) spawnZom(1,1);   // le boss est la des la premiere seconde du niveau 7
   syncZoms();                // et tous les zombies du niveau aussi
   msg='LEVEL '+n+' : '+WORLDS[world].n; msgT=2.6;
@@ -679,7 +683,7 @@ function good(){
   if(target>6){ target=0;
     // Arc-en-ciel complet : le jeu s'arrete NET. On ne peut plus mourir apres coup.
     score+=100; flyText(hx,hy-CELL*2.2,'+100','#ffd76a',1);
-    if(!miss){ score+=200; flyText(hx,hy-CELL*3,'PERFECT!  +200','#ffd76a',1);
+    if(!miss){ score+=200; flyText(hx,hy-CELL*3,'PERFECT!  +200','#ffd76a',1); A('PERFECT_RAINBOW');
       confetti(40,1); snd(1200,.3,'triangle',.05); }
     fanfare(); shake=Math.min(shake+8,14); msg=''; msgT=0; punch=1.6; flash=.5; flashCol='#ffffff';
     for(var i=0;i<7;i++){ burstAt(hx,hy,RB[i],12);
@@ -714,6 +718,11 @@ function checkRec(){ newRec=0;
 function finishWin(){ mode='win'; T=0; checkRec();
   LB(0,runT*1e3|0);                        // temps du run complet
   if(lives>2){ LB(1,runT*1e3|0); LB(2,kills); LB(3,kills); }   // jamais touche de la partie
+  A('RAINBOW_FREED');
+  if(lives>2) A('FLAWLESS');
+  if(lives===1) A('LAST_HOPE');            // fini sur la derniere vie
+  if(!kills) A('PACIFIST');                // pas un seul zombie touche
+  if(runT<SPEED) A('SPEEDRUN');
 }
 function drawMini(x,y,sz,i){
   var bob=Math.abs(Math.sin(T*5+i))*sz*.35; y-=bob;
@@ -1261,11 +1270,24 @@ var WD=self.Wavedash;
 
 // Les quatre classements. 0-1 = temps (croissant, en ms), 2-3 = zombies (decroissant).
 var LBN=['fastest-run','fastest-flawless-run','zombies-before-first-hit','zombies-flawless-run'];
+// Seuil du speedrun, en secondes de temps de jeu effectif.
+// Mesure (8 graines, autopilote de scripts/record-gif.mjs) : le plancher
+// theorique du jeu -- distance a parcourir x vitesse du serpent, chemin
+// toujours libre -- est de 80 s en moyenne, l'autopilote boucle en 89 s.
+// Une mort relance le niveau et coute ~11 s, donc 100 s exige un run propre.
+var SPEED=100;
 
 // Rien de ce bloc n'a le droit de casser la partie : une methode disparue du SDK,
 // un joueur deconnecte ou un reseau coupe doivent rester sans effet visible.
 function nop(){}
 function guard(f){ if(WD) try{ var q=f(); if(q&&q.catch) q.catch(nop); }catch(e){} }
+
+// Les trophees. setAchievement est synchrone ; le SDK ne repersiste pas un
+// trophee deja debloque, mais storeNow=true declenche quand meme un flush
+// reseau a chaque appel : le getAchievement en amont evite ce bruit.
+// A savoir : setAchievement ne fait rien tant que requestStats() n'a pas
+// repondu, et rien non plus pour un identifiant absent du Developer Portal.
+function A(i){ guard(function(){ WD.getAchievement(i)||WD.setAchievement(i,!0); }); }
 
 function LB(i,v){ guard(function(){
   return WD.getOrCreateLeaderboard(LBN[i],i<2?0:1,i<2?2:0).then(function(r){
@@ -1284,5 +1306,9 @@ function cloudLoad(){ guard(function(){
 
 // init() doit passer avant tout autre appel SDK : c'est lui qui sort le jeu
 // de l'ecran de chargement Wavedash.
-guard(function(){ WD.init(); cloudLoad(); });
+// Un guard par appel : si le SDK perdait une de ces methodes, les autres
+// doivent continuer a passer. init() d'abord, c'est lui qui revele le jeu.
+guard(function(){ WD.init(); });
+guard(function(){ WD.requestStats(); });
+cloudLoad();
 </script></body></html>
