@@ -336,7 +336,7 @@ roadroller but still overwrites `unirush.zip`, and the result is around
 
 ## Who made this
 
-I am **Ruben**, I am 9 years old, and this is my game.
+I am **Ruben** and this is my game.
 
 I am learning to make games with my dad, who does this for a living, and with
 Claude. My dad explains how things work and checks what goes in, Claude helps me
@@ -346,13 +346,3 @@ The design is mine: the snake-unicorn with a rainbow tail, eating in colour
 order, wandering zombies that spawn per world, the Tron trail crash, three
 lives, the telegraphed zombie eyes, and the rule that finishing a rainbow must
 freeze the game instantly so you can never die after winning.
-
-## Credits
-
-Game design by **Ruben, age 9**.
-
-Code and art direction pair-programmed with my dad and with Claude (Anthropic).
-
-Music: *Rainbow Fanfare*, an original 4-bar theme, arranged seven ways.
-
-MIT licensed. Do whatever you like with it.
